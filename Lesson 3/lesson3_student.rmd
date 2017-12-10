@@ -21,8 +21,8 @@ Notes:
 Notes:
 
 ```{r Histogram of Users\' Birthdays}
-install.packages('ggplot2')
-library(ggplot2)
+#install.packages('ggplot2')
+#library(ggplot2)
 ```
 
 ***
@@ -61,7 +61,12 @@ Notes:
 Notes:
 
 ```{r Faceting}
+library(ggplot2)
+fb <- read.csv(file= 'pseudo_facebook.tsv',sep='\t')
 
+table(fb$gender)
+
+by(fb$friend_count, fb$gender, mean)
 ```
 
 #### Let’s take another look at our plot. What stands out to you here?
@@ -114,7 +119,7 @@ Notes:
 ```{r Faceting Friend Count}
 # What code would you add to create a facet the histogram by gender?
 # Add it to the code below.
-qplot(x = friend_count, data = pf, binwidth = 10) +
+qplot(x = friend_count, data = fb, binwidth = 10) +
   scale_x_continuous(limits = c(0, 1000),
                      breaks = seq(0, 1000, 50))
 ```
@@ -153,6 +158,17 @@ Notes:
 
 ```{r Tenure}
 
+#print(fb$tenure)
+
+#Output for Tenure as is
+
+qplot(x = na.omit(fb$tenure), binwidth = 25,
+      color = I('black'), fill = I('#00ff00'), xlab = 'Tenure in Years')+
+  scale_x_continuous(breaks = 0:7)
+
+#ggplot(data = fb) +
+#  geom_histogram(aes(tenure),binwidth = 25)
+
 ```
 
 ***
@@ -160,6 +176,20 @@ Notes:
 #### How would you create a histogram of tenure by year?
 
 ```{r Tenure Histogram by Year}
+library(ggthemes)
+?seq()
+
+#Output for tenure with NA and in Years
+
+a <- na.omit(fb$tenure)
+
+qplot(x = (a/365), binwidth = 0.25,
+      color = I('black'), fill = I('#099DD9'), xlab = 'Tenure in Years')+
+  scale_x_continuous(breaks = 0:7, limits = c(0,7))
+
+ggplot(aes(x = tenure/365), data = fb) +
+  geom_histogram(binwidth = .25, color = 'black', fill = '#F79420')+
+  scale_x_continuous(breaks = seq(0, 7, 0.5), limits = c(0,7))
 
 ```
 
@@ -179,11 +209,21 @@ Notes:
 
 ```{r User Ages}
 
+qplot(x = age, data = fb, binwidth = 2,color = '#0000ff', fill = '#F79420')+
+  scale_x_continuous(breaks = seq(0,120,5))
+
+ggplot(aes(x = age), data = fb) +
+  geom_histogram(binwidth = 1, color = 'black', fill = '#F79420')+
+  scale_x_continuous(breaks = seq(0, 120, 5))
+
+ggplot(aes(x = age), data = fb) +
+  geom_bar()+
+  scale_x_continuous(breaks = seq(0, 120, 5))
 ```
 
 #### What do you notice?
 Response:
-
+Most people are of age 18, frequency is high in 20-25, and there are some unnatural spikes after 100 close to 93-94, this seems to be counter-intuitive.
 ***
 
 ### The Spread of Memes
@@ -198,13 +238,49 @@ Notes:
 
 ### Transforming Data
 Notes:
+```{r transforming freind count}
+print('Regular Summary')
+summary(fb$friend_count)
 
+print('log10 Summary')
+summary(log10(fb$friend_count + 1))
+
+print('SQRT Summary')
+summary(sqrt(fb$friend_count))
+
+qplot(x = friend_count, data = fb)+
+  scale_x_log10()
+
+
+```
 ***
 
 ### Add a Scaling Layer
 Notes:
 
-```{r Add a Scaling Layer}
+```{r fig.width=20, fig.height=30}
+library(ggplot2)
+library(gridExtra)
+library(scales)
+?trans_breaks
+?scale_x_log10
+
+p1 = ggplot(aes(x = (friend_count+1)), data = fb)+
+  geom_histogram(binwidth = 0.05)+
+  scale_x_log10(breaks = trans_breaks("log10", function(x) 10^(x)))+
+  labs(x = 'Log(X) Friend Count')
+
+p2 = ggplot(aes(x = (friend_count)), data = fb)+
+  geom_histogram(binwidth = 0.5)+
+  scale_x_sqrt(breaks = trans_breaks("sqrt", function(x) x ^ 2))+
+  labs(x = 'sqrt(X) Friend Count')
+
+p3 = ggplot(aes(x = (friend_count)), data = fb)+
+  geom_histogram(binwidth = 50)+
+  scale_x_continuous(breaks = seq(10,2500,250), limits = c(10,2500))+
+  labs(x = '(X) Friend Count')
+
+grid.arrange(p1, p2, p3, ncol=2)
 
 ```
 
@@ -213,7 +289,35 @@ Notes:
 
 ### Frequency Polygons
 
-```{r Frequency Polygons}
+```{r fig.width=10, fig.height=10}
+
+library(ggthemes)
+
+p4 = ggplot(aes(x = friend_count, y = ..count../sum(..count..)), data = subset(fb, !is.na(gender)))+
+  geom_freqpoly(aes(color = gender), binwidth = 10)+
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,50))+
+  xlab('Friend Count')+
+  theme_solarized()
+
+p5 = ggplot(aes(x = friend_count, y = ..density..), data = subset(fb, !is.na(gender)))+
+  geom_freqpoly(aes(color = gender), binwidth = 10)+
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,50))+
+  xlab('Friend Count')+
+  theme_solarized()
+
+p6 = ggplot(aes(x = friend_count), data = subset(fb, !is.na(gender)))+
+  geom_freqpoly(aes(color = gender), binwidth = 10)+
+  scale_x_continuous(limits = c(0,1000), breaks = seq(0,1000,50))+
+  xlab('Friend Count')+
+  theme_solarized()
+
+grid.arrange(p4, p5,p6, ncol = 1)
+
+ggplot(aes(x = friend_count, y = ..count../sum(..count..)), data = subset(fb, !is.na(gender)))+
+  geom_freqpoly(aes(color = gender), binwidth = 10)+
+  scale_x_continuous(limits = c(350,1000), breaks = seq(350,1000,20))+
+  xlab('Friend Count')+
+  theme_solarized()
 
 ```
 
@@ -224,6 +328,60 @@ Notes:
 
 ```{r Likes on the Web}
 
+library(data.table)
+
+ggplot(aes(x = www_likes), data = subset(fb, !is.na(gender)))+
+  geom_freqpoly(aes(color = gender), binwidth = 100)+
+  scale_x_continuous(limits = c(0,350),breaks = seq(0,350,25))+
+  xlab('Friend Count')+
+  theme_solarized()
+
+a <- fb$likes[between(fb$www_likes,1,8000)]
+tail(a)
+str(a)
+
+df = c()
+df2 = c()
+
+i=1
+
+
+for (x in fb$likes)
+{ 
+  if (x < 1) {}
+    else {if (x < 800) {df <- c(df,x) }}
+}
+
+for (x in fb$likes)
+{ 
+  
+  if (x < 1) {}
+    else {if (x < 800) {df2 <- c(df2,fb$gender[i]) }}
+  i=i+1
+}
+
+tail(df)
+tail(df2)
+
+write.csv(df, 'txt.csv')
+
+by(fb$likes[(between(fb$www_likes,1, 800))],fb$gender[(between(fb$www_likes,1, 800))],summary)
+
+summary(fb$likes > 0 & fb$likes < 80, fb$gender == 'female')
+summary(fb$likes > 0, fb$gender == 'male')
+
+?count
+
+range(fb$likes[(fb$www_likes > 1 & fb$www_likes < 800)], na.rm = TRUE)
+
+by(fb$likes,fb$gender,summary)
+
+#limits = c(0,1000), breaks = seq(0,1000,50)
+
+library(data.table)
+sum(subset(fb$www_likes, fb$gender == 'male'))
+sum(subset(fb$www_likes, fb$gender == 'female'))
+
 ```
 
 
@@ -233,13 +391,28 @@ Notes:
 Notes:
 
 ```{r Box Plots}
+library(ggplot2)
+
+ggplot(aes(gender,friend_count), data= subset(fb,!is.na(gender)))+
+  geom_boxplot()+
+  scale_y_continuous(limits = c(1,750),
+                     breaks = seq(0,750,100))
 
 ```
 
 #### Adjust the code to focus on users who have friend counts between 0 and 1000.
 
 ```{r}
+ggplot(aes(gender,friend_count), data= subset(fb,!is.na(gender)))+
+  geom_boxplot()+
+  scale_y_continuous(limits = c(0,1000),
+                     breaks = seq(0,750,100))
 
+ggplot(aes(gender,friend_count), data= subset(fb,!is.na(gender)))+
+  geom_boxplot()+
+  coord_cartesian(ylim =c(0,250))
+
+#use cord_cartesian for zooming into data, without changing the axis.
 ```
 
 ***
@@ -248,6 +421,15 @@ Notes:
 Notes:
 
 ```{r Box Plots, Quartiles, and Friendships}
+ggplot(aes(gender,friendships_initiated), data= subset(fb,!is.na(gender)))+
+  geom_boxplot()+
+  coord_cartesian(ylim = c(1,200))
+
+str(fb)
+
+by(fb$friendships_initiated, fb$gender, mean)
+
+dim(subset(fb,fb$gender == 'male'))
 
 ```
 
@@ -267,6 +449,20 @@ Response:
 Notes:
 
 ```{r Getting Logical}
+library(scales)
+
+mobile_check_in <- NA
+fb$mobile_check_in <- ifelse(fb$mobile_likes>0, "Yes", "NO")
+fb$mobile_check_in <- factor(fb$mobile_check_in)
+head(fb$mobile_check_in)
+
+#Use Proportion of a Table Function to find out percetage
+a<-prop.table(table(fb$mobile_check_in))
+
+paste(a*100,'%')
+
+summary(subset(fb$mobile_check_in, fb$mobile_check_in == "Yes"))
+
 
 ```
 
