@@ -1,0 +1,489 @@
+---
+title: "Assignment EDA"
+author: "Sagar Sarkar"
+date: "January 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(ggthemes)
+library(psych)
+library(dplyr)
+library(zoo)
+library(gridExtra)
+library(memisc)
+library(GGally)
+library(scales)
+loan <- read.csv(file= "prosperLoanData.csv")
+```
+This is a data set of loans received by individuals in United States over a period of 10 years (2005-2014).
+Let kick off with some insights into the data.
+
+There are over 81 variables so we will focusing on a few.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+dim(loan)
+
+str(loan)
+
+names(loan)
+
+```
+
+Lets plot some basic graphs about Monthly loan Payments, Occupation, Purpose of Loan, Borrower APR, Credit Rating and Credit Score. This seems like a good place to start, have some ideas about Delinquency and Debt-To-Income Ratios, will throw these variables in when it makes sense.
+
+##1. Univariate Plots Section
+
+
+#####1A. Monthly Payments
+Lets look at Monthly Loan Payments
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+qplot(loan$MonthlyLoanPayment)
+
+```
+
+
+Now lets adjust the bin width a little bit to a bin size of 5 and add a change the x axis a little to get a cleaner graph.
+
+
+```{r  message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(aes(MonthlyLoanPayment),data=loan)+
+  geom_histogram(binwidth= 25)+
+  xlab("Monthly Payments")+
+  ggtitle("Monthly Payments Till $700")+
+  scale_x_continuous(breaks = seq(0,1000,50), limits = c(0,700))
+```
+
+
+Notice: Maximum payer, keep there Monthly payment around $175, although there is a considerable long tail, but the bluck of the data is around $100 to $200, and then there is bucket of $200-$400, and $400-$600, we can break it down in later part of the analysis.
+
+
+Now Lets look at Occupation.
+
+
+#####1B. Occupation
+
+It looks like we might have too many Occupation to represent pictorially, so we will table them to get an idea of the most common occupation among our loan recipients.
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+#loan$Occupation <- as.factor(loan$Occupation)
+
+count(loan,Occupation,sort = FALSE)%>%
+  arrange(desc(n))
+```
+
+
+So, we can see that most common occupation is "Other", might be the case that people didn't want to divulge this information or were un-employed, there might be several other reasons for this though. We will have to dig in to find out, if this data set provides any insight on this or not.
+
+
+Few other common occupations are "Professional"(again this can mean anything, but we are sure they have jobs), "Computer Programmer", "Executive", etc. The interesting point to take away from this is actually least people noted there occupation as "Student-Technical", although there are several student sub-categories, would have assumed fair bit of the occupation to be comprised of Students as there are fair bit of "Student Loans" taken out each year, but our data-set maybe heavy of other categories of Loans, lets see Loan Categories to find out more.
+
+
+#####1C.Purpose of Loan (Listing Category)
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+#summary(loan$ListingCategory..numeric.)
+
+ggplot(data=subset(loan, !is.numeric(loan$ListingCategory)), 
+       aes(loan$ListingCategory))+
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 90))+
+    scale_x_continuous(labels=c("0 - Not Available",
+"1 - Debt Consolidation","2 - Home Improvement", 
+"4 - Business", "5 - Personal Loan", "5 - Student Use", 
+"6 - Auto", "7- Other", "8 - Baby&Adoption", "9 - Boat", 
+"10 - Cosmetic Procedure", "11 - Engagement Ring", 
+"12 - Green Loans", 
+"13 - Household Expenses", "14 - Large Purchases", 
+"15 - Medical/Dental", "16 - Motorcycle", "17 - RV"," 18 - Taxes", 
+"19 - Vacation", "20 - Wedding Loans"),
+breaks= c(0:20))
+```
+
+
+This is really interesting to see that most people take loans in our data set for Debt Consolidation, Home Improvement and Business loans being the next most common, if we skip the "Other" Category data.Very less people actually take Student loans here, maybe because majority of the student loans are given out by government agencies and not private banks.
+It would be interesting to look at how Borrower APR changes with each of these categories, in our future analysis.
+
+
+#####1D.Borrower APR
+
+
+```{r message=FALSE, warning=FALSE,echo=FALSE}
+ggplot(data= subset(loan, !(is.null(loan$BorrowerAPR))), aes(BorrowerAPR))+
+  geom_histogram(binwidth = 0.005)+
+  scale_x_continuous(limits=c(0,0.45), breaks = seq(0,0.45,.025))
+```
+
+Interesting to see the bulk of the data is in between 0.125-0.275, with pretty uniform distribution, but surprisingly most people pay a higher APR at about 0.365 (about 3.65%). Would be interesting to observe if the mean APR has close linear relationship with Credit Rating or Credit Score of borrowing individuals.
+
+#####1E. Credit Grade and Credit Score
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+table((loan$CreditGrade) == "", dnn = "Credit Grade Blank")
+
+ggplot(data= loan, aes(CreditGrade))+
+  geom_bar()+
+  stat_count(geom="text", aes(label=..count..), vjust= -.5)
+```
+
+As Credit Grade was only applicable till 2009, we will have trim this blank("") level out of this factor to get a good representation of the data.
+
+```{r fig.height=6, fig.width=8, message=FALSE, warning=FALSE}
+
+ggplot(data= subset(loan, !(loan$CreditGrade=="")), aes(CreditGrade))+
+  geom_bar()+
+  stat_count(geom="text",aes(label=..count..),vjust=-1)
+```
+
+
+Now we can see clearly that most of the loans given out were for C and D grades, closely followed by B grade. Curious to how this would compare to Credit Ratings of the Loan recipients.
+
+```{r echo=FALSE, fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+
+p1 <- ggplot(data= subset(loan, (loan$CreditScoreRangeLower>0)), 
+             aes(CreditScoreRangeLower))+
+  geom_bar()+
+  scale_x_continuous(limits = c(450,900), breaks = seq(450,900,50))+
+  ggtitle("Lower Credit Score")+
+  stat_count(geom="text", aes(label=..count..), vjust=-.5)
+
+p2 <- ggplot(data= subset(loan, (loan$CreditScoreRangeUpper>0)), 
+             aes(CreditScoreRangeUpper))+
+  geom_bar()+
+  scale_x_continuous(limits = c(450,900), breaks = seq(450,900,50))+
+  ggtitle("Upper Credit Score")+
+  stat_count(geom="text", aes(label=..count..), vjust=-.5)
+
+grid.arrange(p1,p2)
+
+```
+
+
+Here, we can see that the data is pretty similarly spread for Upper and Lower Credit Ratings, Lower Credit rating having the highest frequency around 675 and Upper Credit rating having highest frequency around 700, for future plot we will consider an average of these rating to continue our analysis. 
+We will create a new column Credit Score.avg for ease of use in the future plots.
+
+
+```{r echo=FALSE, fig.height=8, fig.width=10, message=FALSE, warning=FALSE}
+
+loan$CreditScore.avg <- (loan$CreditScoreRangeLower + 
+                           loan$CreditScoreRangeUpper)/2
+
+ggplot(data= subset(loan, (loan$CreditScore.avg>0)), aes(CreditScore.avg))+
+  geom_bar()+
+  scale_x_continuous(limits = c(450,900), breaks = seq(450,900,50))+
+  ggtitle("Average Credit Score")+
+  stat_count(geom="text", aes(label=..count..), vjust=-.5)
+
+```
+
+As, expected the result comes out pretty similar to the graphs above. 
+
+### What is the structure of your dataset?
+The data is spread out through 81 varibales, which makes analyzing every variable a little tricky so, for my anaylysis I have decided to focus on Credit score/Credit Grade, Borrow APR/Rate, Income Range, Stated Monthly Income and Purpose of loan. These will be key variables we explore.
+
+### What is/are the main feature(s) of interest in your dataset?
+The main feature so far would be to see how Credit Rating effects the Borrow Rate/APR, and to find out how laon recipients are handling there debt.
+
+We will continue to use this in our Bi variate analysis, can't wait to find out the relations between Credit Ratings, Borrower APR will throw in Delinquency and Debt-to-Income ratios as well, to find out what they do.
+
+Let dive in.
+
+#2. Bivariate Analysis
+
+Lets begin our analysis of the Borrower APR Rate to find out what kind of relationship does this bring into picture, we have predicted there should be a pretty inverse relationship between APR and Credit Rating, so as Credit Rating of Score is higher We except people to get a better Rate of interest lets find out if our data reflects that.
+
+#####2A. Borrower APR and Credit Grade
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(data = subset(loan, CreditGrade!= ""), aes(CreditGrade,BorrowerAPR))+
+  geom_point()+
+  ggtitle("Scatter Plot for Borrower APR and Credit Grade")
+
+```
+
+
+Lets look at a Box plot for this to figure out where do most APR's lie for different Credit Ratings.
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(data = subset(loan, CreditGrade!= ""), aes(CreditGrade,BorrowerAPR))+
+  geom_boxplot()+
+  ggtitle("Box Plot Credit Grade to Borrower APR")
+
+```
+
+
+That looks pretty uniform variation over the different Credit Grades. Hmm, that doesn't look right, well our data ranges from 2004-2014, over 10 years remember, we probably will have to taken an average of the Borrower APR to get a better representation of relationship between the two.
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(data = subset(loan, CreditGrade!= ""), aes(CreditGrade,BorrowerAPR, 
+                                                  group=1))+
+  geom_line(stat="summary", fun.y=mean, position = )+
+  scale_x_discrete(limit = c("AA","A","B","C","D","E","HR","NC"))+
+  ggtitle("Average Borrow APR vs Credit Grade")
+
+credit_group <- group_by(subset(loan,loan$CreditGrade !=""), CreditGrade)
+
+print("Summary of Credit Grades of Average Borrow APR")
+summarise(credit_group, Mean = mean(BorrowerAPR, na.rm = TRUE))
+```
+
+Lets try to answer this question with the findings from our graph above.
+
+### Did you observe any interesting relationships between the other features \ (not the main feature(s) of interest)?
+
+As, we can see the hunch was right, this is arranged in order of Highest credit Rating to Lowest, as refereed from the leading hub ^[1](https://lendinghub.com.au/Info/CreditGrades.php)^ and prosper rating data^[2](https://books.google.com/books?id=yHZfqDObDRAC&pg=PA28&lpg=PA28&dq=credit+grade+aa,+a,+b,+c,+d,e,+hr,+nc&source=bl&ots=XrE9rKrhjj&sig=kc8ea6C_6BC_Wm4M4pnd-Z3vfb0&hl=en&sa=X&ved=0ahUKEwiAlLfEsNjYAhUm7IMKHbpTB60Q6AEIKTAA#v=onepage&q=credit%20grade%20aa%2C%20a%2C%20b%2C%20c%2C%20d%2Ce%2C%20hr%2C%20nc&f=false)^.
+
+We can see that as the credit grade gets worse the loan has significantly higher APR, and topping off at HR (high risk) at 0.271 or 2.71%, only slightly higher than "E" which has 2.70%
+
+Lets through in some loan year data here to see how this vaired over the years.
+
+For this we will re-format the loan orginating date and only extract the year from it and store it in another column called loan originating.Year. We will look at this graph in the final plots section.
+
+Lets look into the Credit Score Ratings to figure out if that has a similar relatioship to Credit Grade with Borrower Rate.
+
+#####2B. Credit Score to Borrower APR
+
+Lets look at the average Borroer APR and Borrower Rate in realtion with the Credit Score of Individual and how it has flunctated over the years.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+loan$LoanOrigination.Year = format(as.Date(loan$LoanOriginationDate),"%Y")
+
+bapr_credit <- ggplot(aes(CreditScore.avg,BorrowerAPR, 
+                          color=LoanOrigination.Year), 
+                      data= subset(loan, CreditScore.avg>450))+
+  geom_smooth(stat = "summary", fun.y= mean)+
+  scale_x_continuous(breaks = seq(450,900,50))+
+  scale_y_continuous(breaks = seq(0.1,0.4,0.05))+
+  ggtitle("Borrower APR with Credit Score over the Years")+
+  theme_hc()+
+  scale_color_hc()
+
+bapr_credit
+
+```
+
+Here, we can clearly see that the Higher the Credit Score lower the Borrow APR, we can in-fact say that it is pretty inverse proportional.
+
+The trend of the years, helps us understand that year 2006-2007, were the lowest APR years, and the rate has been going in an uptrend when the inconomy was suffering from 2008 higher than 2007, and 2009 much higher than 2008, and infact 2011-2013 were the worst for lower Credit score folks. 
+
+Finally, we can see that 2014 is actualy a bit lower in terms of Borrow APR, copming down considerablly, but still not lower than the 2009 levels and even denying loans to folks lower than 650 credit score.
+
+One final observation will be the highest credit ratings of 850 and above never really suffered high APR even in worst of the years.
+
+Lets see if the Borrower Rate has a similar relation with Credit Score.
+
+```{r echo=FALSE, fig.height=6, fig.width=10, message=FALSE, warning=FALSE}
+
+ pbr_credit <- ggplot(aes(CreditScore.avg,BorrowerRate, 
+                          color=LoanOrigination.Year), 
+                      data= subset(loan, CreditScore.avg>450))+
+  geom_smooth(stat = "summary", fun.y= mean)+
+  scale_x_continuous(breaks = seq(450,900,50))+
+  scale_y_continuous(breaks = seq(0.1,0.4,0.05))+
+  ggtitle("Borrower Rate with Credit Score over the Years")+
+  theme_hc()+
+  scale_color_hc()
+
+grid.arrange(pbr_credit,bapr_credit, nrow=1)
+
+```
+
+
+The plots are pretty similar, with the only difference being that the rate scale for Borrower Rate is slightly lower, this maybe because people generally have more than full year, there by diluting the Borrower rate for the term of the loan. 
+
+
+```{r message=FALSE, warning=FALSE}
+summary(loan$Term)
+```
+
+
+So, looking a the loan term actaully suggests that minimum time, people take their loans for is 12 months, and maximum people having loan term of 3 years.
+
+Lets finish this of by looking at how the mean Borrow APR changes over different Income Ranges and Credit Score above 800.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+
+ggplot(aes(x= BorrowerAPR), data= subset(loan, CreditScore.avg>800))+
+  geom_density(aes(color= IncomeRange,
+                   fill= IncomeRange))+
+  facet_wrap(~IncomeRange, ncol=3, scales="free")+
+  ggtitle("Borrower APR on Credit Score above 800 of different Income Ranges")
+  
+```
+
+
+This graph is very close to expectations, only curious that many unemployed people have a credit score over 800, although the data shows for these cases the APR is higher than 0.1 which is is in line with expectation, only anamoly is $0 income folks have a low APR of 0.1, which is similar to that of the whole group, would have expected this too be higher. 
+
+Maybe these are students taking out loans, which can explain the lower rate inspite of having no income.
+
+The debt consildation loans were taken by maximum individuals for apying off there debt, so lets look at the debt-to-income ratio accross different Icome groups to figure out which groups have highest debt and get some insights.
+
+#####2C. Debt-to-Income Ratio
+
+Let look at a plot of Debt-to-Income Ratio and figure out which groups have highest debt. as we can see below that debt to income has 99% percentile of data in less than 0.86 range, we will limit our analysis to that.
+
+```{r message=FALSE, warning=FALSE, message=FALSE}
+
+  
+quantile(loan$DebtToIncomeRatio,0.99, na.rm = TRUE)
+
+ggplot(aes(y= DebtToIncomeRatio, x=IncomeRange), 
+       data= subset(loan,DebtToIncomeRatio<0.86))+
+  geom_boxplot()+
+  scale_x_discrete(limits=c("$0","$1-24,999","$25,000-49,999",
+                            "$50,000-74,999","$75,000-99,999",
+                            "$100,000+", "Not employed"))
+```
+
+
+As, we can see above the $0 income folks don't have any debt, so maybe they are students, but we can see affirmatevly that most debt is held by the income range of below $25000.
+There are lot of outliers in each income bracket though.
+
+Lets look at Monthly income to debt and see if we can figure out status of there loan payments.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+ggplot(aes(y= DebtToIncomeRatio, x= StatedMonthlyIncome,color= LoanStatus), 
+       data= subset(loan,DebtToIncomeRatio<0.86))+
+  geom_point(alpha=0.1)+
+  scale_x_continuous(limits = c(0,20000))+
+  theme_solarized()+
+  scale_color_solarized(limits= c("Cancelled","Defaulted","Completed"))
+
+```
+
+There are a fair bit of defaults, but for the most part folks have paid off there loans showing the completed status.
+
+#MultiVariate Analysis
+
+We looked at the Borrower rate to Credit Score Rating data and this seems like a good candiate for building seeing the correlation coffecient.
+
+Lets get started.
+
+```{r echo=FALSE, fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
+loan2 <- loan[,c("BorrowerAPR","CreditScore.avg", "IncomeRange",
+                 "DebtToIncomeRatio","BorrowerRate","LenderYield",
+                 "EstimatedReturn"
+                 ,"CurrentDelinquencies","StatedMonthlyIncome",
+                 "LoanOriginalAmount")]
+
+ggcorr(loan2,label =TRUE, label_size = 3, size = 3)
+```
+
+### Were there any interesting or surprising interactions between features?
+Yes, about the relationship of Credit Score and Borrow rate.
+Credit Score has a correraltion of only -0.5 to Borrow rate, initially I would have more than that, but we were looking at a subset of the data, not everything there.
+
+
+### Were there features that strengthened each other in terms of \looking at your feature(s) of interest?
+
+Lender Yield and BorrowAPR has a perfect correclation, even Estimated Return and BorrowAPR have a correlation of 0.8, which suggests that the bank is making good money from there loan rate of interest. Original Loan amount and Monthly Income don't seem to have any correlation with most of the other variable, even DebttoIncome Ratio doesn't seem to be effecting any other attributes.
+
+Lets now look at if the every state has similar rate of Borrow APR.
+
+```{r echo=FALSE, fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+ggplot(aes(x= BorrowerAPR), data= subset(loan, CreditScore.avg>500))+
+  geom_density(aes(color= BorrowerState,
+                   fill= BorrowerState))+
+  facet_wrap(~BorrowerState, ncol=7, scales="free")+
+  ggtitle("Borrower APR on Credit Score above 500 of different States")
+
+```
+
+Most of the states average bulk of there 0.1 or 0.2 APR, with the exception of Wayoming, which is pretty Uniformally distributed.
+
+
+
+#Final Plots
+
+##1. Browwer Rate to Credit Ratings
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(data = subset(loan, (CreditGrade!= "")), aes(x= CreditGrade,
+                                            y= BorrowerAPR,
+                                            color=LoanOrigination.Year, 
+                                            group = LoanOrigination.Year))+
+  geom_line(stat="summary", fun.y=mean, position = )+
+  scale_x_discrete(limit = c("AA","A","B","C","D","E","HR","NC"))+
+  ggtitle("Average Borrow APR vs Credit Grade by Loan Origination Year")+
+  theme_hc()+
+  scale_color_hc()
+
+```
+
+As we can see here 2006 and 2007, APR were pretty low and consistent, after that 2008, rate of interest was consistently high among on average, 2009 though was all over the place giving lower interest rates to AA and A grade loan recipients and then shooting up for B, C and D. 
+
+Another thing to notice is Credit Grade E and above didn't get any loans in 2009 , and in 2008 one one with a NC _(No Credit)_ grade received a loan _(considering the dataset has all the data)_.
+This might be caused due to the great recession, I wonder, well that question might not be answerable with Causality from this data set, but its definitely a good possibility. 
+
+##2. Credit Score to Borrower APR
+
+```{r message=FALSE, warning=FALSE, echo =FALSE}
+ggplot(aes(CreditScore.avg,BorrowerAPR, color=LoanOrigination.Year), 
+       data= subset(loan, CreditScore.avg>450))+
+  geom_smooth(stat = "summary", fun.y= mean)+
+  xlab("Average Credit Score")+
+  scale_x_continuous(breaks = seq(450,900,50))+
+  scale_y_continuous(breaks = seq(0.1,0.4,0.05))+
+  ggtitle("Borrower Rate with Credit Score over the Years")+
+  theme_hc()+
+  scale_color_hc()
+```
+
+
+As, we can confirm from the above two graphs, both Borrow APR and Borrow Rate flunctatede simultaneouly over the years of 2008-2012, finally stabelizing around 2013-2014, coming back to the regular APR mark. 
+
+These two graphs put together is very good indication of how the Loan Rate varied in light of the Marco Economic conditions of the country.
+
+##3. Debt to Income Ratio by Monthly Income and Loan Status 
+
+```{r echo=FALSE, fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
+ggplot(aes(y= DebtToIncomeRatio, x= StatedMonthlyIncome,color= LoanStatus), 
+       data= subset(loan,DebtToIncomeRatio<0.86))+
+  geom_jitter(alpha=0.5)+
+  xlab("Stated Monthly Income in USD")+
+  scale_x_continuous(limits = c(0,20000))+
+  theme_hc()+
+  scale_color_hc(limits= c("Cancelled","Current","Defaulted","Completed",
+                           "Chargedoff", "Past Due (91-120 days)"))+
+  ggtitle("Debt ot Income Ratio of 95th percentile with Monthly 
+          Income and Loan Status")
+```
+
+Here, in this graph, we can clearly see that most of the loans are either Current or Completed, there are a considerable number of loans Defaulted and Cancelled, though not much at all in comparison.
+
+So, the key then would be to keep the Debtto Income Ratio low, so most people could pay there loans in timely fashion. In constrast when we look at the graph below for people having too much Debt-toIncome Ratio, we can see the rate of Defaults, Charege offs and Cancellations going up drastically in comaprison to Completed loans.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(aes(y= DebtToIncomeRatio, x= StatedMonthlyIncome,color= LoanStatus), 
+       data= subset(loan,DebtToIncomeRatio>0.86))+
+  geom_jitter(alpha=0.5)+
+  scale_x_continuous(limits = c(0,5000))+
+  theme_hc()+
+  xlab("Stated Monthly Income in USD")+
+  scale_color_hc(limits= c("Cancelled","Current","Defaulted","Completed",
+                           "Chargedoff", "Past Due (91-120 days)"))+
+  ggtitle("Debt ot Income Ratio above 0.86 with Monthly Income 
+          and Loan Status")
+
+```
+
+#Reflection
+
+I really enjoyed going through this loan data and finiding meaningful insights, the bottom line would be that keeping the debt-to-income ratio low would definetly be the key to paying off debt. Which is surprising though, as initially I would have thought the ratio of default would be insalely high look at the number of debt consolidation loans that were taken by individuals. This might be because of the low APR enjoyed by the loans in comparison to credit card debt APR which is usually north of 15% for aeverage users.
+
+To conclude, I wouold have actaully thought that there is a strong correlation between Credit score and APR that borrowers get, but definetly there are a lot more variables that come into picture, not just Credit Score or Credit Rating being deciding factors, this was a key leanring for me as I was exploring this data set.
+
+Challenges were to figure out coloring, labelling issues, to increase readablity of my graphs, as most of it is hit and trail. Now, that I have worked with ggthemes and theme_hc in particular, I think this meets my taste, and I happy with the final outcome.

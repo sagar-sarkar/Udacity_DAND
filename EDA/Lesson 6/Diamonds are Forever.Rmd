@@ -1,0 +1,209 @@
+---
+title: "Diamond Analysis"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+data(diamonds)
+
+ggplot(aes(x= diamonds$carat, y= diamonds$price), data= diamonds)+
+  geom_point(alpha= 0.05)+
+  geom_smooth(method= 'lm')+
+  geom_abline(slope = 10000, intercept = 0)+
+  xlim(c(0,quantile(diamonds$carat,0.99)))+
+  ylim(c(0,quantile(diamonds$price,0.99)))
+  
+```
+GGpairs function and sampling the dataset to get and idea of the data in it.
+```{r message=FALSE, warning=FALSE, paged.print=TRUE}
+
+set.seed(20022012)
+diamonds.samp <- diamonds[sample(1:length(diamonds$price),10000),]
+
+library(scales)
+library(GGally)
+
+suppressMessages(ggpairs(diamonds.samp,
+  lower = list(continuous = wrap("points", shape = I('.'))),
+  upper = list(combo = wrap("box", outlier.shape = I('.')))))
+
+
+```
+AS Carat is nothing but volume of the diamonds, lets now look at cuberoot of diamond's carat(x*y*z) is relation to price.
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+Math.cbrt <- function(x) {
+  sign(x)*abs(x)^(1/3)
+}
+
+ggplot(aes(x= Math.cbrt(diamonds$carat), y= diamonds$price), data= diamonds)+
+  geom_point(alpha= 0.05)+
+  geom_smooth(method= 'lm')+
+  xlim(c(0,quantile(diamonds$carat,0.99)))+
+  ylim(c(0,quantile(diamonds$price,0.99)))+
+  coord_cartesian(xlim = c(0.5:1.5))
+```
+Check: https://classroom.udacity.com/nanodegrees/nd002/parts/9f3e2782-9409-4c7a-b3d7-6197edfee54e/modules/67c46ff5-5a70-402e-881b-558d374953c6/lessons/755209509/concepts/8675788300923 to get to know when we have to use log scales or not.
+
+
+
+```{r}
+#Quiz: use grid.arrange
+
+library(gridExtra)
+
+plot1 <- qplot(x=price, data = diamonds, binwidth= 100) + 
+  ggtitle('Price')
+
+plot2 <- qplot(x= log10(price), data = diamonds, binwidth= 0.01) +
+  ggtitle('Price (log10)')
+
+grid.arrange(plot1,plot2, nrow=1 )
+```
+
+Cube Root of Carat to Log 10 Price graph to see the graph of price to carat
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+
+library(scales)
+
+cuberoot_trans = function() trans_new('cuberoot',
+  transform= function(x) x^(1/3),
+  inverse= function(x) x^3)
+
+p1<- suppressMessages(ggplot(aes(carat, y= price), data= diamonds)+
+  geom_point()+
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2,3), breaks = c(0.2,0.5,1,2,3))+
+  scale_y_continuous(trans= log10_trans(), limits = c(350,15000), breaks = c(350,1000,5000,10000,15000)))+
+  ggtitle("Scales changed in this graph")
+
+#Notice the difference between actually changing the data and just changing Axis
+
+p2 <- ggplot(aes(x= Math.cbrt(diamonds$carat), y= log10(diamonds$price)), data= diamonds)+
+  geom_point(alpha= 0.05)+
+  ggtitle("Values cahnged with Cube Root and Log10")
+
+grid.arrange(p2,p1)
+
+head(diamonds)
+
+
+```
+
+ Set the transparency to one half, the size to three-fourths, and jitter the points.
+ 
+```{r}
+p3= ggplot(aes(carat, price), data = diamonds) + 
+  geom_point(alpha = 0.1) + 
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+                     breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+                     breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('alpha=0.1 Price (log10) by Cube-Root of Carat')
+p4<-ggplot(aes(carat, price), data = diamonds) + 
+  geom_point(alpha = 0.5) + 
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+                     breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+                     breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('alpha=0.5 Price (log10) by Cube-Root of Carat')
+
+p5<-ggplot(aes(carat, price), data = diamonds) + 
+  geom_point(alpha = 0.25) + 
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+                     breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+                     breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('alpha=0.25 Price (log10) by Cube-Root of Carat')
+
+p6<-ggplot(aes(carat, price), data = diamonds) + 
+  geom_jitter(alpha = 0.05,size = 0.75) + 
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+                     breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+                     breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Jitter Price (log10) by Cube-Root of Carat')
+
+suppressWarnings(grid.arrange(p4,p5,p6,p3, ncol=2))
+```
+
+Adding more details to carat vs price graph by adding clarity,cut,etc. to the plot
+```{r}
+
+library(RColorBrewer)
+
+#Clarity
+ggplot(aes(x = carat, y = price), data = diamonds) + 
+  geom_point(alpha = 0.1, size = 0.5, position = 'jitter', aes(color= clarity)) +
+  scale_color_brewer(type = 'div', palette= 'Green',
+    guide = guide_legend(title = 'Clarity', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+  coord_cartesian(xlim = c(0.2,0.5))+
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+    breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+    breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Price (log10) by Cube-Root of Carat and Clarity')
+
+#cut
+
+ggplot(aes(x = carat, y = price), data = diamonds) + 
+  geom_point(alpha = 0.1, size = 1, position = 'jitter', aes(color= cut)) +
+  scale_color_brewer(type = 'div', palette= 'RdYlBu',
+    guide = guide_legend(title = 'Cut', reverse = T,
+    override.aes = list(alpha = 1, size = 2))) +
+  coord_cartesian(xlim = c(0.2,0.5))+
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+    breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+    breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Price (log10) by Cube-Root of Carat and Cut')
+
+#Color
+ggplot(aes(x = carat, y = price), data = diamonds) + 
+  geom_point(alpha = 0.1, size = 1, position = 'jitter', aes(color= color)) +
+  scale_color_brewer(type = 'div', palette= 'RdYlBu',
+    guide = guide_legend(title = 'Color',
+    override.aes = list(alpha = 1, size = 2))) +
+  coord_cartesian(xlim = c(0.2,0.5))+
+  scale_x_continuous(trans = cuberoot_trans(), limits = c(0.2, 3),
+    breaks = c(0.2, 0.5, 1, 2, 3)) + 
+  scale_y_continuous(trans = log10_trans(), limits = c(350, 15000),
+    breaks = c(350, 1000, 5000, 10000, 15000)) +
+  ggtitle('Price (log10) by Cube-Root of Carat and Color')
+
+  
+
+
+
+```
+ 
+ 
+ Linear modelling of Diamond prices are done below
+ 
+```{r}
+library(memisc)
+
+m1<- summary(lm(I(log(price))~I(carat^(1/3)), data= diamonds))
+m2<- update(m1, ~. + carat)
+m3<- update(m1, ~. + color)
+m4<- update(m1, ~. + cut)
+m5<- update(m1, ~. + clarity)
+
+?`mtable-class`
+
+mtable(m1,m2,m3,m4, sdigits = 3)
+
+#predictive modelling
+
+thisDiamond = data.frame(carat =1.00, cut= "V.Good",
+                         color= "I", clarity="VS1")
+
+modelEstimate = predict(m5, newdata = thisDiamond, 
+                        interval= "prediction", level=0.95)
+
+exp(modelEstimate)
+
+```
+ 
+ 

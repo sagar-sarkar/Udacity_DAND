@@ -1,0 +1,115 @@
+---
+title: "Assignment EDA"
+author: "Sagar Sarkar"
+date: "January 11, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(psych)
+library(dplyr)
+library(zoo)
+loan <- read.csv(file= "prosperLoanData.csv")
+```
+This is a dataset of loans recieved by individuals in United States over a period of 10 years (2005-2014).
+Let kick off with some insights into the data.
+
+There are over 81 varibales so we will focusing on a few.
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+dim(loan)
+
+str(loan)
+
+names(loan)
+
+```
+
+Lets plot some basic graphs about Montly loan Payments, Occupation, Purpose of Loan, Borrower APR, Credit Rating and Credit Scrore. This seems like a good place to start, have some ideas about Deliquency and Debt-To-Income Ratios, will throw these varibales in when it makes sense.
+
+##1. Univariate Plots Section
+
+
+#####1A. Monthly Payments
+Lets look at Monthly Loan Payments
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+qplot(loan$MonthlyLoanPayment)
+
+```
+
+
+Now lets adjust the binwidth a little bit to a bisize of 5 and add a change the x axis a little to get a cleaner graph.
+
+
+```{r  message=FALSE, warning=FALSE, echo=FALSE}
+ggplot(aes(MonthlyLoanPayment),data=loan)+
+  geom_histogram(binwidth= 25)+
+  xlab("Monthly Payments")+
+  ggtitle("Monthly Payments Till $700")+
+  scale_x_continuous(breaks = seq(0,1000,50), limits = c(0,700))
+
+```
+
+
+Notice: Maximum payer, keep there Monthly payment around $175, although there is a considerable long tail, but the bluck of the data is around $100 to $200, and then there is bucket of $200-$400, and $400-$600, we can break it down in later part of the analysis.
+
+
+Now Lets look at Occupation.
+
+
+#####1B. Occupation
+
+It looks like we might have too many Occupation to represent pictorially, so we will table them to get an idea of the most common occupation amoung our loan recipients.
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+#loan$Occupation <- as.factor(loan$Occupation)
+
+count(loan,Occupation,sort = FALSE)%>%
+  arrange(desc(n))
+```
+
+
+So, we can see that most common occupation is "Other", might be the case that people didn't want to divelge this information or were un-employed, there might be several other resons for this though. We will have to dig in to find out, if this dataset provides any insight on this or not.
+
+
+Few other common occupations are "Professional"(again this can mean anything, but we are sure they have jobs), "Computer Programmer", "Executive", etc. The intersing point to take away from this is actually least people noted there occuptaion as "Student-Technical", although there are several student sub-categories, would have assumed fair bit of the occupation to be comprised of Students as there are fair bit of "Student Loans" taken out each year, but our data-set maybe heavy of other categories of Loans, lets see Loan Categories to find out more.
+
+
+#####1C.Purpose of Loan (Listing Category)
+
+
+```{r message=FALSE, warning=FALSE, echo=FALSE}
+
+loan$ListingCategory..numeric. = as.factor(loan$ListingCategory..numeric.)
+
+loan$ListingCategory <- data.frame(cols=c("Not Available","Debt Consolidation",
+                                          "","","","","","","","","","","","","","","","","",
+                                          "",""),
+                                   val=as.factor(loan$ListingCategory..numeric.), stringsAsFactors = TRUE)
+
+str(loan$ListingCategory..numeric.)
+  
+switch(as.character(loan$ListingCategory..numeric.),
+                               "0" = (loan$ListingCategory = as.character("Not Available")),
+                               "1" = (loan$ListingCategory = as.character("Debt Consolidation")),
+                               "N/A")
+
+ggplot(data=loan, aes(loan$ListingCategory))+
+  geom_histogram()+
+    scale_x_continuous(labels=c("0- Not Available",
+"Debt Consolidation","Home Improvement", "Business", "Personal Loan", "5 - Student Use", 
+"6 - Auto", "7- Other", "8 - Baby&Adoption", "9 - Boat", "10 - Cosmetic Procedure", "11 - Engagement Ring", 
+"12 - Green Loans", 
+"13 - Household Expenses", "14 - Large Purchases", 
+"15 - Medical/Dental", "16 - Motorcycle", "17 - RV"," 18 - Taxes", "19 - Vacation", "20 - Wedding Loans"),
+breaks= c(0,1,2,3,4,5,6,7,8,9,10
+          ,11,12,13,14,15,16,17,18,19,20), )
+```
+
